@@ -1,40 +1,49 @@
-# ==============================================================================
-# ETAPA 1: Compilación de Dependencias Binarias y Ruedas (Wheels)
-# ==============================================================================
-FROM python:3.11-slim-bookworm AS builder
+# ==========================================
+# ETAPA 1: Constructor (Builder)
+# ==========================================
+FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
+# Instalar herramientas esenciales de compilación si tus paquetes requieren compilar código C
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    gcc \
     && rm -rf /var/lib/apt/lists/*
 
+# Copiar el archivo de configuración del proyecto
 COPY pyproject.toml .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip wheel --no-cache-dir --wheel-dir /build/wheels -r <(python3 -c "import tomllib; f=open('pyproject.toml','rb'); d=tomllib.load(f); print('\n'.join(d['project']['dependencies']))")
 
-# ==============================================================================
-# ETAPA 2: Entorno de Ejecución en Producción (Runtime Ultra-Liviano)
-# ==============================================================================
-FROM python:3.11-slim-bookworm
+# Actualizar pip, extraer dependencias de pyproject.toml y generar los archivos Wheel (.whl)
+RUN pip install --no-cache-dir --upgrade pip && \
+    python3 -c "import tomllib; f=open('pyproject.toml','rb'); d=tomllib.load(f); open('reqs.txt', 'w').write('\n'.join(d['project']['dependencies']))" && \
+    pip wheel --no-cache-dir --wheel-dir /build/wheels -r reqs.txt && \
+    rm reqs.txt
+
+# ==========================================
+# ETAPA 2: Imagen Final (Runtime)
+# ==========================================
+FROM python:3.11-slim AS runner
 
 WORKDIR /app
 
-COPY --from=builder /build/wheels /wheels
+# Crear un usuario de sistema no raíz por seguridad e infraestructura limpia
+RUN useradd -u 10001 -m appuser && \
+    chown -R appuser:appuser /app
 
-RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/* \
-    && rm -rf /wheels
+# Copiar únicamente los paquetes pre-compilados (Wheels) desde la etapa anterior
+COPY --from=builder /build/wheels /app/wheels
+COPY --from=builder /build/pyproject.toml /app/pyproject.toml
 
-COPY gema_orquestador/ /app/gema_orquestador/
-COPY pyproject.toml /app/
+# Copiar el código fuente de tu aplicación (Orquestador y módulos secundarios)
+COPY --chown=appuser:appuser . /app/
 
-RUN pip install --no-cache-dir -e .
+# Instalar las dependencias locales usando los Wheels sin descargar nada de internet
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --no-index --find-links=/app/wheels /app/wheels/*.whl && \
+    rm -rf /app/wheels
 
-EXPOSE 8888
+# Cambiar al usuario no raíz para la ejecución del contenedor
+USER appuser
 
-ENV MARLETTE_HMAC_SECRET="V40_OMEGA_DEFAULT_SECURE_KEY_2027"
-ENV PYTHONUNBUFFERED=1
-
-ENTRYPOINT ["gema"]
-CMD ["server", "--host", "0.0.0.0", "--port", "8888"]
+# Definir el comando por defecto para arrancar el orquestador unificado
+ENTRYPOINT ["python", "gema_orquestador/main.py"]
