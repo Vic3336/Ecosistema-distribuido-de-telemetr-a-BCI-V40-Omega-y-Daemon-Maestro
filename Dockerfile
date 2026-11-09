@@ -9,5 +9,5 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install .
 
 # Comando de arranque apuntando al daemon maestro
-CMD ["python", "tu_carpeta/daemon.py"]
+CMD ["python", "gema_orquestador/daemon.py"]
 
