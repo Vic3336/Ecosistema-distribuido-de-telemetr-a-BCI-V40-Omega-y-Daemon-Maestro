@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gema-orquestador"
-version = "40.0.0-omega"
+version = "1.0.0-omega"
 description = "Ecosistema distribuido de telemetría BCI V40-Omega y Daemon Maestro"
 readme = "README.md"
 requires-python = ">=3.10"
