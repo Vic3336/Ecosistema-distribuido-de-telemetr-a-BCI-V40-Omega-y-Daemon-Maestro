@@ -1,11 +1,13 @@
-# Usamos una imagen oficial de Python con soporte moderno
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copias el pyproject.toml y dejas que pip lo lea de forma nativa
 COPY pyproject.toml .
+# Si tienes más código fuente, asegúrate de copiarlo también:
+COPY . .
 
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip wheel --no-cache-dir --wheel-dir /build/wheels -e .
-    
+    pip install .
+
+# Comando con el que arrancará tu daemon maestro o script principal
+CMD ["python", "daemon.py"]
