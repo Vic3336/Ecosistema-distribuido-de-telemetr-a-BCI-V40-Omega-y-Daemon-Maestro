@@ -240,3 +240,19 @@ def setup_signals(daemon: V40MasterDaemon) -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, daemon.shutdown)
   
+if __name__ == "__main__":
+    HOST = os.environ.get("HOST", "0.0.0.0")
+    PORT = int(os.environ.get("PORT", 8888))
+    SECRET_KEY = os.environ.get("MARLETTE_HMAC_SECRET", "V40_OMEGA_DEFAULT_SECURE_KEY_2027").encode()
+
+    daemon = V40MasterDaemon(host=HOST, port=PORT, secret_key=SECRET_KEY)
+    
+    loop = asyncio.get_event_loop()
+    try:
+        setup_signals(daemon)
+        loop.run_until_complete(daemon.start())
+    except KeyboardInterrupt:
+        daemon.shutdown()
+    finally:
+        loop.close()
+        
